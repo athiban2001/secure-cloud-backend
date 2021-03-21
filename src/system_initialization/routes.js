@@ -36,7 +36,6 @@ adminRouter.post("/groups", jwtAuth("ADMIN"), async (req, res) => {
 	const email = req.body.email;
 	const password = req.body.password;
 	const groupName = req.body.groupName;
-	console.log(req);
 
 	if (!managerName || !email || !password || !groupName) {
 		res.status(300).json({ error: "Invalid Body Data" });
@@ -82,6 +81,7 @@ adminRouter.get("/groups", jwtAuth("ADMIN"), async (req, res) => {
 		"SELECT g.id,g.name,m.name as manager_name,m.email FROM groups g,managers m WHERE g.group_manager_id=m.id OFFSET 0 LIMIT 100"
 	);
 	if (err) {
+		console.log(err);
 		res.status(500).json({ error: "Groups Fetching Unsucessful" });
 		return;
 	}
@@ -108,6 +108,7 @@ adminRouter.get("/groups/:id", jwtAuth("ADMIN"), async (req, res) => {
 		[id]
 	);
 	if (err) {
+		console.log(err);
 		res.status(500).json({ error: "No Group is Found" });
 		return;
 	}
