@@ -36,6 +36,17 @@ CREATE TABLE requests(
 	group_id integer,
 	Xi text,
 	FOREIGN KEY(user_id) REFERENCES users(id),
-	FOREIGN KEY(group_id) REFERENCES groups(id)
+	FOREIGN KEY(group_id) REFERENCES groups(id),
+	joining boolean,
 	ok boolean
+);
+
+CREATE TABLE members (
+	id serial PRIMARY KEY,
+	user_id integer,
+	group_id integer,
+	join_time timestamp,
+	"Xik" text,
+	FOREIGN KEY(user_id) REFERENCES users(id),
+	FOREIGN KEY(group_id) REFERENCES groups(id)
 );

@@ -4,16 +4,17 @@ const jwtAuth = (role) => {
 	return (req, res, next) => {
 		let token = (req.headers["authorization"] || "").replace("Bearer ", "");
 		if (!token) {
-			res.status(300).json({ error: "Authorization Required 1" });
+			res.status(300).json({ error: "Authorization Required" });
 			return;
 		}
 		const { isVerified, payload } = jwt.verifyToken(token);
+		console.log(isVerified, payload);
 		if (!isVerified) {
-			res.status(300).json({ error: "Authorization Required 2" });
+			res.status(300).json({ error: "Authorization Required" });
 			return;
 		}
 		if (role !== payload.role) {
-			res.status(300).json({ error: "Authorization Required 3" });
+			res.status(300).json({ error: "Authorization Required" });
 			return;
 		}
 

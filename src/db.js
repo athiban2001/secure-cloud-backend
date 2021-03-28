@@ -2,9 +2,12 @@ const { Pool } = require("pg");
 
 const pool = new Pool({
 	connectionString: process.env.DATABASE_URL,
-	ssl: {
-		rejectUnauthorized: false,
-	},
+	ssl:
+		process.env.NODE_ENV === "development"
+			? undefined
+			: {
+					rejectUnauthorized: false,
+			  },
 });
 
 const query = async (queryString, parameters) => {
@@ -27,4 +30,5 @@ const query = async (queryString, parameters) => {
 
 module.exports = {
 	query,
+	pool,
 };
