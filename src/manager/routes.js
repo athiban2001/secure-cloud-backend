@@ -71,7 +71,7 @@ managerRouter.get("/requests", jwtAuth("MANAGER"), async (req, res) => {
 		response,
 		error,
 	} = await db.query(
-		"SELECT r.id,r.user_id,r.group_id,r.xi,r.joining,r.ok,(SELECT name FROM users WHERE id=r.user_id) as user_name,(SELECT email FROM users WHERE id=r.user_id) as email,(SELECT name FROM groups WHERE id=r.group_id) AS group_name FROM requests r WHERE r.group_id=1 AND r.ok IS NULL",
+		"SELECT r.id,r.user_id,r.group_id,r.xi,r.joining,r.ok,(SELECT name FROM users WHERE id=r.user_id) as user_name,(SELECT email FROM users WHERE id=r.user_id) as email,(SELECT name FROM groups WHERE id=r.group_id) AS group_name FROM requests r WHERE r.group_id=$1 AND r.ok IS NULL",
 		[groupId]
 	);
 	if (error) {
