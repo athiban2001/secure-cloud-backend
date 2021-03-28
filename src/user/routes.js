@@ -81,7 +81,7 @@ userRouter.get("/groups", jwtAuth("USER"), async (req, res) => {
 		response,
 		err,
 	} = await db.query(
-		"SELECT g.id,g.name,m.name as manager_name,g.p,g.g,g.q,(SELECT r.id FROM requests r WHERE r.group_id=g.id AND r.user_id=$1) AS is_requested,(SELECT r.ok FROM requests r WHERE r.group_id=g.id) AS is_accepted FROM groups g,managers m WHERE g.group_manager_id=m.id OFFSET 0 LIMIT 100",
+		"SELECT g.id,g.name,m.name as manager_name,g.p,g.g,g.q,(SELECT r.id FROM requests r WHERE r.group_id=g.id AND r.user_id=$1) AS is_requested,(SELECT r.ok FROM requests r WHERE r.group_id=g.id AND r.user_id=$1) AS is_accepted FROM groups g,managers m WHERE g.group_manager_id=m.id OFFSET 0 LIMIT 100",
 		[req.payload.id]
 	);
 	if (err) {
