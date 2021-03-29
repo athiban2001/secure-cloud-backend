@@ -132,6 +132,13 @@ adminRouter.delete("/groups/:id", async (req, res) => {
 	try {
 		await client.query("BEGIN");
 		response = await client.query(
+			"DELETE FROM requests WHERE group_id=$1",
+			[id]
+		);
+		response = await client.query("DELETE FROM members WHERE group_id=$1", [
+			id,
+		]);
+		response = await client.query(
 			"DELETE FROM groups WHERE id=$1 RETURNING group_manager_id",
 			[id]
 		);
