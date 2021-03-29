@@ -126,26 +126,24 @@ adminRouter.delete("/groups/:id", async (req, res) => {
 		return;
 	}
 
-	const {
-		response,
-		err,
-	} = await db.query(
-		"DELETE FROM groups WHERE id=$1 RETURNING group_manager_id",
-		[id]
-	);
-	if (err || response.rowCount != 1) {
+	const client = await db.pool.connect();
+	let response;
+
+	try {
+		await client.query("BEGIN");
+		response = await client.query(
+			"DELETE FROM groups WHERE id=$1 RETURNING group_manager_id",
+			[id]
+		);
+		let { rows } = response;
+		response = await client.query("DELETE FROM managers WHERE id=$1", [
+			rows[0].group_manager_id,
+		]);
+		await client.query("COMMIT");
+	} catch (e) {
+		console.log(e);
+		await client.query("ROLLBACK");
 		res.status(500).json({ error: "Unable to delete Group " + id });
-		return;
-	}
-	const { err: e } = await db.query("DELETE FROM managers WHERE id=$1", [
-		response.rows[0].group_manager_id,
-	]);
-	if (e) {
-		res.status(500).json({
-			error:
-				"Unable to delete Group Manager " +
-				response.rows[0].group_manager_id,
-		});
 		return;
 	}
 
