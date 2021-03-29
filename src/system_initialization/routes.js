@@ -56,10 +56,10 @@ adminRouter.post("/groups", jwtAuth("ADMIN"), async (req, res) => {
 			[managerName, email, hashedPassword]
 		);
 		const { rows } = response;
-		console.log(rows);
+		console.log(rows[0].id);
 		response = await client.query(
-			"INSERT INTO groups(name,p,q,g,group_manager_id) VALUES($1,$2,$3,$4,(SELECT id FROM managers WHERE email=$5)) RETURNING *",
-			[groupName, p, q, g, email]
+			"INSERT INTO groups(name,p,q,g,group_manager_id) VALUES($1,$2,$3,$4,$5) RETURNING *",
+			[groupName, p, q, g, rows[0].id]
 		);
 		await client.query("COMMIT");
 	} catch (e) {
