@@ -55,6 +55,7 @@ adminRouter.post("/groups", jwtAuth("ADMIN"), async (req, res) => {
 		[managerName, email, hashedPassword]
 	);
 	if (err) {
+		console.log(err);
 		res.status(500).json({ error: "Group Creation unsuccessful" });
 		return;
 	}
@@ -69,6 +70,7 @@ adminRouter.post("/groups", jwtAuth("ADMIN"), async (req, res) => {
 	);
 
 	if (e) {
+		console.log(e);
 		res.status(500).json({ error: "Group Creation unsuccessful" });
 		return;
 	}
