@@ -47,35 +47,30 @@ adminRouter.post("/groups", jwtAuth("ADMIN"), async (req, res) => {
 	const g = dh.findG(p, q);
 	const hashedPassword = await bcrypt.hash(password, 8);
 
-	const {
-		response,
-		err,
-	} = await db.query(
-		"INSERT INTO managers(name,email,password) VALUES($1,$2,$3) RETURNING *",
-		[managerName, email, hashedPassword]
-	);
-	if (err) {
-		console.log(err);
-		res.status(500).json({ error: "Group Creation unsuccessful" });
-		return;
-	}
-
-	const { rows } = response;
-	const {
-		response: resp,
-		err: e,
-	} = await db.query(
-		"INSERT INTO groups(name,p,q,g,group_manager_id) VALUES($1,$2,$3,$4,$5) RETURNING *",
-		[groupName, p, q, g, rows[0].id]
-	);
-
-	if (e) {
+	const client = await db.pool.connect();
+	let response;
+	try {
+		await client.query("BEGIN");
+		response = await client.query(
+			"INSERT INTO managers(name,email,password) VALUES($1,$2,$3) RETURNING *",
+			[managerName, email, hashedPassword]
+		);
+		const { rows } = response;
+		response = await client.query(
+			"INSERT INTO groups(name,p,q,g,group_manager_id) VALUES($1,$2,$3,$4,$5) RETURNING *",
+			[groupName, p, q, g, rows[0].id]
+		);
+		await client.query("COMMIT");
+	} catch (e) {
 		console.log(e);
+		await client.query("ROLLBACK");
 		res.status(500).json({ error: "Group Creation unsuccessful" });
 		return;
+	} finally {
+		client.release();
 	}
 
-	res.status(201).json({ ...resp.rows[0] });
+	res.status(201).json({ ...response.rows[0] });
 });
 
 adminRouter.get("/groups", jwtAuth("ADMIN"), async (req, res) => {
