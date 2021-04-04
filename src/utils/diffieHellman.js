@@ -1,17 +1,18 @@
+const { getPrimeNumber, bitLength } = require("./prime");
 const prime = require("./prime");
 
-const findPandQ = async () => {
-	let q = await prime.getPrimeNumber(250);
-	let p = 2n * q + 1n;
-	while (!prime.isPrime(p)) {
-		q = await prime.getPrimeNumber(250);
-		p = 2n * q + 1n;
-	}
-	return {
-		p,
-		q,
-	};
-};
+// const findPandQ = async () => {
+// 	let q = await prime.getPrimeNumber(250);
+// 	let p = 2n * q + 1n;
+// 	while (!prime.isPrime(p)) {
+// 		q = await prime.getPrimeNumber(250);
+// 		p = 2n * q + 1n;
+// 	}
+// 	return {
+// 		p,
+// 		q,
+// 	};
+// };
 
 const findG = (p, q) => {
 	p = BigInt(p);
@@ -23,13 +24,6 @@ const findG = (p, q) => {
 	}
 	return g;
 };
-
-// console.log(
-// 	findG(
-// 		2892008489112152977727500423395925534448265782469434025702914019945396937427n,
-// 		1446004244556076488863750211697962767224132891234717012851457009972698468713n
-// 	)
-// );
 
 const findP = (q) => {
 	q = BigInt(q);
@@ -45,7 +39,29 @@ const findP = (q) => {
 	}
 };
 
+const findPandQ = async () => {
+	let q = await getPrimeNumber(250);
+	q = BigInt(q);
+	let p;
+	let r = 2n;
+
+	while (true) {
+		p = r * q + 1n;
+		if (prime.isPrime(p)) {
+			if (bitLength(p) < 256) {
+				return { p, q };
+			} else {
+				q = await getPrimeNumber(250);
+				r = 1n;
+				p = r * q + 1n;
+			}
+		}
+		r++;
+	}
+};
+
 module.exports = {
 	findP,
 	findG,
+	findPandQ,
 };

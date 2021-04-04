@@ -42,8 +42,7 @@ adminRouter.post("/groups", jwtAuth("ADMIN"), async (req, res) => {
 		return;
 	}
 
-	const q = await prime.getPrimeNumber(250);
-	const p = dh.findP(q);
+	const { p, q } = await dh.findPandQ();
 	const g = dh.findG(p, q);
 	const hashedPassword = await bcrypt.hash(password, 8);
 
@@ -98,11 +97,16 @@ adminRouter.get("/groups/:id", jwtAuth("ADMIN"), async (req, res) => {
 		return;
 	}
 
-	const {
-		response,
-		err,
-	} = await db.query(
-		"SELECT g.id,g.name,m.name as manager_name,m.email FROM groups g,managers m WHERE g.group_manager_id=m.id AND g.id=$1 OFFSET 0 LIMIT 100",
+	const { response, err } = await db.query(
+		`
+		SELECT g.id,g.name,m.name as manager_name,m.email,(
+			SELECT array_to_json(array_agg(row_to_json(data))) as members FROM 
+			(SELECT DISTINCT ON (mm.user_id) u.name,u.email,mm.* 
+			FROM members mm,users u WHERE mm.group_id=$1 AND mm.user_id=u.id ORDER BY mm.user_id ASC,mm.join_time ASC LIMIT 1) data
+		)
+		FROM groups g,managers m 
+		WHERE g.group_manager_id=m.id AND g.id=$1 OFFSET 0 LIMIT 100
+		`,
 		[id]
 	);
 	if (err) {
@@ -112,6 +116,7 @@ adminRouter.get("/groups/:id", jwtAuth("ADMIN"), async (req, res) => {
 	}
 	const { rowCount, rows } = response;
 	if (rowCount != 1) {
+		console.log(rows);
 		res.status(404).json({ error: "No Group is Found" });
 		return;
 	}

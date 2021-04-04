@@ -88,7 +88,7 @@ const getPrimeNumber = (bitLength, iterations = 16) => {
 		let rnd = 0n;
 		do {
 			rnd = fromBuffer(randBitsSync(bitLength, true));
-		} while (!_isProbablyPrime(rnd, iterations));
+		} while (!isProbablyPrime(rnd, iterations));
 		return new Promise((resolve) => {
 			resolve(rnd);
 		});
@@ -188,7 +188,7 @@ const randBytes = (byteLength, forceLength = false) => {
 				reject(err);
 			}
 			if (forceLength) {
-				buf[0] = buf[0] | 128;
+				buff[0] = buff[0] | 128;
 			}
 			resolve(buff);
 		});
@@ -352,4 +352,5 @@ module.exports = {
 	randBetween,
 	modPow,
 	gcd: eGcd,
+	bitLength,
 };
