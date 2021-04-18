@@ -1,8 +1,10 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const nanoid = require("nanoid").nanoid;
 const db = require("../db");
 const jwt = require("../utils/jwt");
 const jwtAuth = require("../system_initialization/middleware");
+const { Delete, Download, Upload } = require("../cloud/cloudOps");
 
 const managerRouter = express.Router();
 
@@ -334,6 +336,148 @@ managerRouter.patch("/requests", jwtAuth("MANAGER"), async (req, res) => {
 	}
 
 	res.status(200).json({ usersRemoved: removeUsersLength });
+});
+
+managerRouter.get("/files", jwtAuth("MANAGER"), async (req, res) => {
+	const {
+		response,
+		err,
+	} = await db.query("SELECT * FROM files WHERE group_id=$1", [
+		req.payload.groupId,
+	]);
+	if (err) {
+		console.log(err);
+		res.status(500).json({ error: "Internal Server Error" });
+		return;
+	}
+	res.status(200).json({ files: response.rows });
+});
+
+managerRouter.get("/files/:id", jwtAuth("MANAGER"), async (req, res) => {
+	const {
+		response,
+		err,
+	} = await db.query("SELECT * FROM files WHERE id=$1 AND group_id=$2", [
+		req.params.id,
+		req.payload.groupId,
+	]);
+	if (err) {
+		console.log(err);
+		res.status(500).json({ error: "Internal Server Error" });
+		return;
+	}
+	if (response.rowCount != 1) {
+		res.status(400).json({ error: "Invalid File ID" });
+		return;
+	}
+	const content = await Download(
+		`${req.payload.groupId}/${response.rows[0].storage_filename}`
+	);
+	res.status(200).json({
+		...response.rows[0],
+		content,
+	});
+});
+
+managerRouter.post("/files", jwtAuth("MANAGER"), async (req, res) => {
+	let response,
+		returnData = {};
+	const client = await db.pool.connect();
+	if (
+		!req.body.original_filename ||
+		!req.body.content ||
+		!req.body.file_size
+	) {
+		res.status(400).json({ error: "Invalid Body Data" });
+		return;
+	}
+
+	try {
+		await client.query("BEGIN");
+		response = await client.query(
+			`SELECT COUNT(id) AS name_count FROM files WHERE
+				group_id=$2 
+				AND POSITION($1 in SPLIT_PART(original_filename,'.',1))>0
+				AND CHAR_LENGTH(SPLIT_PART(original_filename,'.',1))-CHAR_LENGTH($1) BETWEEN 0 AND 3;`,
+			[req.body.original_filename.split(".")[0], req.payload.groupId]
+		);
+		returnData.storage_filename = `${nanoid()}`;
+		if (req.body.original_filename.includes(".tar.gz")) {
+			returnData.storage_filename += ".tar.gz.enc";
+		} else {
+			returnData.storage_filename += ".gz.enc";
+		}
+
+		if (response.rows[0].name_count == 0) {
+			returnData.original_filename = req.body.original_filename;
+		} else if (req.body.original_filename.includes(".tar.gz")) {
+			returnData.original_filename = req.body.original_filename.replace(
+				".tar.gz",
+				`(${response.rows[0].name_count}).tar.gz`
+			);
+		}
+		response = await client.query(
+			`INSERT INTO files(group_id,user_id,original_filename,storage_filename,file_time,file_size,is_uploaded) 
+				VALUES($1,NULL,$2,$3,$4,$5,$6) RETURNING *`,
+			[
+				req.payload.groupId,
+				returnData.original_filename,
+				returnData.storage_filename,
+				new Date(),
+				req.body.file_size,
+				true,
+			]
+		);
+		returnData.file_id = response.rows[0].id;
+		Upload(
+			`${req.payload.groupId}/${returnData.storage_filename}`,
+			req.body.content
+		)
+			.on("error", (err) => {
+				throw err;
+			})
+			.on("finish", async () => {
+				res.status(200).json({ ...returnData });
+			});
+		await client.query("COMMIT");
+	} catch (err) {
+		await client.query("ROLLBACK");
+		console.log(err);
+		res.status(500).json({ error: "Internal Server Error" });
+	} finally {
+		client.release();
+	}
+});
+
+managerRouter.delete("/files/:id", jwtAuth("MANAGER"), async (req, res) => {
+	let response;
+	const client = await db.pool.connect();
+	try {
+		await client.query("BEGIN");
+		response = await client.query(
+			"SELECT * FROM files WHERE id=$1 AND group_id=$2",
+			[req.params.id, req.payload.groupId]
+		);
+		if (response.rowCount != 1) {
+			res.status(400).json({ error: "Invalid File ID" });
+			return;
+		}
+		await client.query("DELETE FROM files WHERE id=$1 AND group_id=$2", [
+			req.params.id,
+			req.payload.groupId,
+		]);
+		await Delete(
+			`${req.payload.groupId}/${response.rows[0].storage_filename}`
+		);
+		await client.query("COMMIT");
+		res.status(200).json({ ...response.rows[0] });
+	} catch (err) {
+		await client.query("ROLLBACK");
+		console.log(err);
+		res.status(500).json({ error: "Internal Server Error" });
+	} finally {
+		client.release();
+	}
 });
 
 module.exports = managerRouter;

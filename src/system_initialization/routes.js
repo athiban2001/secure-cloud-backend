@@ -5,6 +5,7 @@ const dh = require("../utils/diffieHellman");
 const jwt = require("../utils/jwt");
 const db = require("../db");
 const jwtAuth = require("./middleware");
+const { DeleteMany } = require("../cloud/cloudOps");
 
 const adminRouter = express.Router();
 
@@ -102,7 +103,7 @@ adminRouter.get("/groups/:id", jwtAuth("ADMIN"), async (req, res) => {
 		SELECT g.id,g.name,m.name as manager_name,m.email,(
 			SELECT array_to_json(array_agg(row_to_json(data))) as members FROM 
 			(SELECT DISTINCT ON (mm.user_id) u.name,u.email,mm.* 
-			FROM members mm,users u WHERE mm.group_id=$1 AND mm.user_id=u.id ORDER BY mm.user_id ASC,mm.join_time ASC LIMIT 1) data
+			FROM members mm,users u WHERE mm.group_id=$1 AND mm.user_id=u.id ORDER BY mm.user_id ASC,mm.join_time ASC) data
 		)
 		FROM groups g,managers m 
 		WHERE g.group_manager_id=m.id AND g.id=$1 OFFSET 0 LIMIT 100
@@ -136,21 +137,18 @@ adminRouter.delete("/groups/:id", async (req, res) => {
 
 	try {
 		await client.query("BEGIN");
-		response = await client.query(
-			"DELETE FROM requests WHERE group_id=$1",
-			[id]
-		);
-		response = await client.query("DELETE FROM members WHERE group_id=$1", [
-			id,
-		]);
+		await client.query("DELETE FROM files WHERE group_id=$1", [id]);
+		await client.query("DELETE FROM requests WHERE group_id=$1", [id]);
+		await client.query("DELETE FROM members WHERE group_id=$1", [id]);
 		response = await client.query(
 			"DELETE FROM groups WHERE id=$1 RETURNING group_manager_id",
 			[id]
 		);
 		let { rows } = response;
-		response = await client.query("DELETE FROM managers WHERE id=$1", [
+		await client.query("DELETE FROM managers WHERE id=$1", [
 			rows[0].group_manager_id,
 		]);
+		await DeleteMany(id);
 		await client.query("COMMIT");
 	} catch (e) {
 		console.log(e);

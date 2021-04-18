@@ -135,7 +135,7 @@ fileRouter.get(
 	async (req, res) => {
 		const { response, err } = await db.query(
 			`
-	SELECT id,file_time,original_filename,file_size FROM files WHERE group_id=$1 AND is_uploaded=true
+	SELECT id,file_time,original_filename,file_size,user_id FROM files WHERE group_id=$1 AND is_uploaded=true
 	AND file_time>(SELECT join_time FROM members WHERE user_id=$2 AND group_id=$1 ORDER BY join_time ASC LIMIT 1)`,
 			[req.params.group_id, req.payload.id]
 		);
@@ -144,7 +144,16 @@ fileRouter.get(
 			res.status(500).json({ error: "Internal Server Error" });
 			return;
 		}
-		res.status(200).json({ files: response.rows });
+		res.status(200).json({
+			files: response.rows.map((file) => {
+				const userId = file.user_id;
+				delete file.user_id;
+				return {
+					...file,
+					isOwner: userId === req.payload.id,
+				};
+			}),
+		});
 	}
 );
 
@@ -161,9 +170,10 @@ fileRouter.get(
 				`SELECT * FROM files 
 				WHERE id=$1 AND group_id=$2 
 				AND is_uploaded=true
-				AND file_time>(SELECT join_time FROM members WHERE user_id=1 AND group_id=1 ORDER BY join_time ASC LIMIT 1)`,
-				[req.params.id, req.params.group_id]
+				AND file_time>(SELECT join_time FROM members WHERE user_id=$3 AND group_id=$2 ORDER BY join_time ASC LIMIT 1)`,
+				[req.params.id, req.params.group_id, req.payload.id]
 			);
+			console.log(response);
 			if (response.rowCount != 1) {
 				throw new Error("No File is Found");
 			}
@@ -192,6 +202,48 @@ fileRouter.get(
 		);
 
 		res.status(200).json({ ...returnData });
+	}
+);
+
+fileRouter.delete(
+	"/:group_id/files/:id",
+	jwtAuth("USER"),
+	memberAuth,
+	async (req, res) => {
+		console.log("HERE");
+		const fileId = req.params.id;
+		if (!fileId) {
+			res.status(400).json({ error: "Invalid File ID" });
+			return;
+		}
+		let response;
+		const client = await db.pool.connect();
+		try {
+			await client.query("BEGIN");
+			response = await client.query(
+				"SELECT * FROM files WHERE id=$1 AND user_id=$2",
+				[fileId, req.payload.id]
+			);
+			if (response.rowCount != 1) {
+				res.status(400).json({ error: "Invalid File ID" });
+				return;
+			}
+			await client.query("DELETE FROM files WHERE id=$1 AND user_id=$2", [
+				fileId,
+				req.payload.id,
+			]);
+			await Delete(
+				`${response.rows[0].group_id}/${response.rows[0].storage_filename}`
+			);
+			await client.query("COMMIT");
+			res.status(200).json({ ...response.rows[0] });
+		} catch (err) {
+			await client.query("ROLLBACK");
+			console.log(err);
+			res.status(500).json({ error: "Internal Server Error" });
+		} finally {
+			client.release();
+		}
 	}
 );
 
